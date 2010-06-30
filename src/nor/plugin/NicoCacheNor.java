@@ -48,18 +48,30 @@ public class NicoCacheNor extends Plugin{
 	// http://smile-{xxxxx}.nicovideo.jp/smile?v={id}.{rand}
 
 	private final Pattern urlPat = Pattern.compile("nicovideo\\.jp/smile\\?\\w+=([0-9]+)\\.(?:[0-9]+)(low)?");
-	private final Pattern cTypePat = Pattern.compile("video/(.*)");
+	private final Pattern cTypePat = Pattern.compile("video/(.+)");
 	private File dir;
 
 	private final Map<String, String> titleMap = new FixedSizeMap<String, String>(20);
 
 	private final EasyLogger LOGGER = EasyLogger.getLogger(NicoCacheNor.class);
 
+	//============================================================================
+	//  Constant strings
+	//============================================================================
 	private static final String Folder = "folder";
 	private static final String DefaultFolder = "./cache/nico";
 
 	private static final String ServerName = "NicoCacheNor/0.1";
 	private static final String MIMETemplate = "video/%s";
+
+	private static final String FindTitlePattern = "<(?:title|TITLE)>(.*)-.*</(?:title|TITLE)>";
+
+	private static final String FilenameTemplate = "sm%s%s-%s.%s";
+
+	private static final String FilenamePattern = "sm%s-.*\\.(.+)";
+	private static final String LowFilenamePattern = "sm%slow-.*\\.(.+)";
+
+	private static final String ForbiddenCharacters = "\"|<|>|\\||\0|:|\\*|\\?|\\\\|&|/";
 
 	//============================================================================
 	//  Public methods
@@ -93,13 +105,13 @@ public class NicoCacheNor extends Plugin{
 
 						if(msg.getCode() == 200){
 
-							reg.add(new ReadonlyPatternFilterAdapter("<(?:title|TITLE)>(.*)-.*</(?:title|TITLE)>"){
+							reg.add(new ReadonlyPatternFilterAdapter(FindTitlePattern){
 
 								@Override
 								public void update(final MatchResult res) {
 
 									final String id = url.group(1);
-									final String title = res.group(1);
+									final String title = res.group(1).replaceAll(ForbiddenCharacters, "");
 
 									titleMap.put(id, title);
 
@@ -121,32 +133,33 @@ public class NicoCacheNor extends Plugin{
 
 						if(msg.getCode() == 200){
 
-							final String id = url.group(1);
-							final String cond = url.group(2) != null ? url.group(2) : "";
-							final String title = titleMap.containsKey(id) ? titleMap.get(id) : "";
+							final HttpHeader header = msg.getHeader();
+							if(!ServerName.equals(header.get(HeaderName.Server))){
 
-							final String filename = String.format("sm%s%s-%s.%s", id, cond, title, cType.group(1));
-							final File dest = new File(NicoCacheNor.this.dir, filename);
-							if(!dest.exists()){
+								final String id = url.group(1);
+								final String cond = url.group(2) != null ? url.group(2) : "";
+								final String title = titleMap.containsKey(id) ? titleMap.get(id) : "";
 
-								try {
+								final String filename = String.format(FilenameTemplate, id, cond, title, cType.group(1));
+								final File dest = new File(NicoCacheNor.this.dir, filename);
+								if(!dest.exists()){
 
-									register.add(new StoringToFileFilter(dest));
+									try {
 
-									// TODO: DL対象が low でなく，かつ low が存在する場合それを削除
+										NicoCacheNor.this.LOGGER.info("Store to " + dest);
+										register.add(new StoringToFileFilter(dest));
 
-								} catch (final IOException e) {
+										// TODO: DL対象が low でなく，かつ low が存在する場合それを削除
 
-									e.printStackTrace();
+									} catch (final IOException e) {
+
+										e.printStackTrace();
+
+									}
 
 								}
 
 							}
-
-							final HttpHeader header = msg.getHeader();
-							header.remove(HeaderName.ETag);
-							header.remove(HeaderName.LastModified);
-							header.set(HeaderName.CacheControl, "no-cache");
 
 						}
 
@@ -231,7 +244,7 @@ public class NicoCacheNor extends Plugin{
 	//============================================================================
 	private File[] findCaches(final String id){
 
-		final Pattern pat = Pattern.compile(String.format("sm%s[^l][^o][^w]-.*\\.(.+)", id));
+		final Pattern pat = Pattern.compile(String.format(FilenamePattern, id));
 		return this.findIfMatches(pat);
 
 	}
@@ -239,7 +252,7 @@ public class NicoCacheNor extends Plugin{
 
 	private File[] findLowCaches(final String id){
 
-		final Pattern pat = Pattern.compile(String.format("sm%slow-.*\\.(.+)", id));
+		final Pattern pat = Pattern.compile(String.format(LowFilenamePattern, id));
 		return this.findIfMatches(pat);
 
 	}
