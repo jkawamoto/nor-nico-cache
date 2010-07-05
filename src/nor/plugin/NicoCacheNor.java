@@ -35,25 +35,23 @@ import nor.core.proxy.filter.ReadonlyPatternFilterAdapter;
 import nor.core.proxy.filter.ResponseFilter;
 import nor.core.proxy.filter.ResponseFilterAdapter;
 import nor.core.proxy.filter.StoringToFileFilter;
+import nor.core.proxy.filter.StoringToFileFilter.CloseEventListener;
 import nor.http.HeaderName;
 import nor.http.HttpHeader;
 import nor.http.HttpRequest;
 import nor.http.HttpResponse;
 import nor.http.Status;
 import nor.util.FixedSizeMap;
-import nor.util.log.EasyLogger;
+import nor.util.log.Logger;
 
 public class NicoCacheNor extends Plugin{
 
 	// http://smile-{xxxxx}.nicovideo.jp/smile?v={id}.{rand}
-
-	private final Pattern urlPat = Pattern.compile("nicovideo\\.jp/smile\\?\\w+=([0-9]+)\\.(?:[0-9]+)(low)?");
-	private final Pattern cTypePat = Pattern.compile("video/(.+)");
 	private File dir;
 
 	private final Map<String, String> titleMap = new FixedSizeMap<String, String>(20);
 
-	private final EasyLogger LOGGER = EasyLogger.getLogger(NicoCacheNor.class);
+	private static final Logger LOGGER = Logger.getLogger(NicoCacheNor.class);
 
 	//============================================================================
 	//  Constant strings
@@ -63,6 +61,11 @@ public class NicoCacheNor extends Plugin{
 
 	private static final String ServerName = "NicoCacheNor/0.1";
 	private static final String MIMETemplate = "video/%s";
+
+	private static final String TitleURLPattern = "/watch/\\w{2}(\\d+)";
+	private static final String VideoURLPattern = "nicovideo\\.jp/smile\\?\\w+=([0-9]+)\\.(?:[0-9]+)(low)?";
+	private static final String TitleMIMEPattern = "html";
+	private static final String VideoMIMEPattern = "video/(.+)";
 
 	private static final String FindTitlePattern = "<(?:title|TITLE)>(.*)-.*</(?:title|TITLE)>";
 
@@ -98,12 +101,12 @@ public class NicoCacheNor extends Plugin{
 		return new ResponseFilter[]{
 
 				// タイトル保存用
-				new ResponseFilterAdapter("/watch/\\w{2}(\\d+)", "html"){
+				new ResponseFilterAdapter(TitleURLPattern, TitleMIMEPattern){
 
 					@Override
 					public void update(final HttpResponse msg, final MatchResult url, final MatchResult cType, final FilterRegister reg) {
 
-						if(msg.getCode() == 200){
+						if(msg.getStatus() == Status.OK){
 
 							reg.add(new ReadonlyPatternFilterAdapter(FindTitlePattern){
 
@@ -113,7 +116,7 @@ public class NicoCacheNor extends Plugin{
 									final String id = url.group(1);
 									final String title = res.group(1).replaceAll(ForbiddenCharacters, "");
 
-									titleMap.put(id, title);
+									NicoCacheNor.this.titleMap.put(id, title);
 
 								}
 
@@ -126,19 +129,19 @@ public class NicoCacheNor extends Plugin{
 				},
 
 				// ビデオファイル保存用
-				new ResponseFilterAdapter(this.urlPat, this.cTypePat){
+				new ResponseFilterAdapter(VideoURLPattern, VideoMIMEPattern){
 
 					@Override
 					public void update(final HttpResponse msg, final MatchResult url, final MatchResult cType, final FilterRegister register) {
 
-						if(msg.getCode() == 200){
+						if(msg.getStatus() == Status.OK){
 
 							final HttpHeader header = msg.getHeader();
 							if(!ServerName.equals(header.get(HeaderName.Server))){
 
 								final String id = url.group(1);
 								final String cond = url.group(2) != null ? url.group(2) : "";
-								final String title = titleMap.containsKey(id) ? titleMap.get(id) : "";
+								final String title = NicoCacheNor.this.titleMap.containsKey(id) ? NicoCacheNor.this.titleMap.get(id) : "";
 
 								final String filename = String.format(FilenameTemplate, id, cond, title, cType.group(1));
 								final File dest = new File(NicoCacheNor.this.dir, filename);
@@ -146,10 +149,34 @@ public class NicoCacheNor extends Plugin{
 
 									try {
 
-										NicoCacheNor.this.LOGGER.info("Store to " + dest);
-										register.add(new StoringToFileFilter(dest));
+										final StoringToFileFilter f = new StoringToFileFilter(dest);
+										if(url.group(2) == null){
 
-										// TODO: DL対象が low でなく，かつ low が存在する場合それを削除
+											// 対象が通常画質の場合，低画質のキャッシュを削除
+											f.addListener(new CloseEventListener() {
+
+												@Override
+												public void close(boolean succeeded) {
+
+													if(succeeded){
+
+														for(final File low : NicoCacheNor.this.findLowCaches(id)){
+
+															low.delete();
+															LOGGER.info("Delete the cache; %s", low);
+
+														}
+
+													}
+
+												}
+
+											});
+
+										}
+										register.add(f);
+
+										LOGGER.info("Store this video to %s", dest);
 
 									} catch (final IOException e) {
 
@@ -176,7 +203,7 @@ public class NicoCacheNor extends Plugin{
 
 		return new MessageHandler[]{
 
-				new MessageHandlerAdapter(this.urlPat){
+				new MessageHandlerAdapter(VideoURLPattern){
 
 					@Override
 					public HttpResponse doRequest(final HttpRequest request, final MatchResult m) {
@@ -218,12 +245,12 @@ public class NicoCacheNor extends Plugin{
 								header.set(HeaderName.Server, ServerName);
 								header.set(HeaderName.ContentType, String.format(MIMETemplate, ext));
 
-								NicoCacheNor.this.LOGGER.info("Returns from the cache: " + src.toString());
+								LOGGER.info("Return from the cache: %s", src);
 
 
 							} catch (final FileNotFoundException e) {
 
-								e.printStackTrace();
+								LOGGER.warning(e);
 
 							}
 
