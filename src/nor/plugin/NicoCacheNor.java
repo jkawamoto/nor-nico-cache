@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -163,7 +164,7 @@ public class NicoCacheNor extends Plugin{
 														for(final File low : NicoCacheNor.this.findLowCaches(id)){
 
 															low.delete();
-															LOGGER.info("Delete the cache; %s", low);
+															LOGGER.info("update", "Delete the cache; {0}", low);
 
 														}
 
@@ -176,7 +177,7 @@ public class NicoCacheNor extends Plugin{
 										}
 										register.add(f);
 
-										LOGGER.info("Store this video to %s", dest);
+										LOGGER.info("update", "Store this video to {0}", dest);
 
 									} catch (final IOException e) {
 
@@ -245,12 +246,13 @@ public class NicoCacheNor extends Plugin{
 								header.set(HeaderName.Server, ServerName);
 								header.set(HeaderName.ContentType, String.format(MIMETemplate, ext));
 
-								LOGGER.info("Return from the cache: %s", src);
+								LOGGER.info("doRequest", "Return from the cache: {0}", src);
 
 
 							} catch (final FileNotFoundException e) {
 
-								LOGGER.warning(e);
+								LOGGER.warning("doRequest", e.toString());
+								LOGGER.catched(Level.FINE, "doRequest", e);
 
 							}
 
