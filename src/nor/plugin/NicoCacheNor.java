@@ -81,7 +81,8 @@ public class NicoCacheNor extends Plugin{
 	//  Public methods
 	//============================================================================
 	@Override
-	public void init(){
+	public void load(final File conf){
+		super.load(conf);
 
 		if(!this.properties.containsKey(Folder)){
 
