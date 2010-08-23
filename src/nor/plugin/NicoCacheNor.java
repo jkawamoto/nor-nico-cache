@@ -18,11 +18,17 @@
 package nor.plugin;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Stack;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
@@ -48,6 +54,7 @@ import nor.util.log.Logger;
 public class NicoCacheNor extends Plugin{
 
 	// http://smile-{xxxxx}.nicovideo.jp/smile?v={id}.{rand}
+	private final Properties properties = new Properties();
 	private File dir;
 
 	private final Map<String, String> titleMap = new FixedSizeMap<String, String>(20);
@@ -81,8 +88,21 @@ public class NicoCacheNor extends Plugin{
 	//  Public methods
 	//============================================================================
 	@Override
-	public void load(final File conf){
-		super.load(conf);
+	public void init(final File conf){
+
+		if(conf.exists()){
+
+			try {
+				this.properties.load(new FileReader(conf));
+			} catch (FileNotFoundException e) {
+				// TODO 自動生成された catch ブロック
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO 自動生成された catch ブロック
+				e.printStackTrace();
+			}
+
+		}
 
 		if(!this.properties.containsKey(Folder)){
 
@@ -289,17 +309,39 @@ public class NicoCacheNor extends Plugin{
 
 	private File[] findIfMatches(final Pattern pat){
 
-		return this.dir.listFiles(new FilenameFilter(){
+		final Stack<File> folders = new Stack<File>();
+		final List<File> files = new ArrayList<File>();
+		folders.push(this.dir);
+
+		final FileFilter filter = new FileFilter(){
 
 			@Override
-			public boolean accept(final File dir, final String name) {
+			public boolean accept(final File file) {
 
-				final Matcher m = pat.matcher(name);
-				return m.matches();
+				if(file.isDirectory()){
+
+					folders.push(file);
+					return false;
+
+				}else{
+
+					final Matcher m = pat.matcher(file.getName());
+					return m.matches();
+
+				}
 
 			}
 
-		});
+		};
+
+		while(folders.size() != 0){
+
+			final File folder = folders.pop();
+			files.addAll(Arrays.asList(folder.listFiles(filter)));
+
+		}
+
+		return files.toArray(new File[0]);
 
 	}
 
