@@ -16,6 +16,8 @@ NicoCache (http://homepage1.nifty.com/asr/tools/nicocache.html) の機能を nor
 
  * folder ダウンロードした動画ファイルの保存先
 
+ここで指定したフォルダのサブフォルダまで検索対象に含めるため，
+エクスプローラなどを用いてキャッシュファイルを整理することができます．
 
 
 ライセンス
