@@ -1,4 +1,4 @@
-NicoCacheNorPlugin
+NicoCacheNorPlugin version 0.1
 =================================
 
 概要
@@ -9,11 +9,15 @@ NicoCache (http://homepage1.nifty.com/asr/tools/nicocache.html) の機能を nor
 次回以降のアクセスにはこのキャッシュを使用することでサーバへの動画配信サーバへの負荷を軽減させます．
 
 
-コンパイル
+使い方
 ---------------------------------
-Maven2 を用いてこのプロジェクトをコンパイルするためには，
-次のプラグインが必要です．
-- serviceloader-maven-plugin: https://github.com/francisdb/serviceloader-maven-plugin
+ダウンロードした，NicoCacheNorPlugin.jar を plugin フォルダに追加してください．
+設定ファイルは nor.plugin.NicoCacheNor.conf で，設定可能な項目は次の通りです．
+
+ * folder ダウンロードした動画ファイルの保存先
+
+ここで指定したフォルダのサブフォルダまで検索対象に含めるため，
+エクスプローラなどを用いてキャッシュファイルを整理することができます．
 
 
 ライセンス

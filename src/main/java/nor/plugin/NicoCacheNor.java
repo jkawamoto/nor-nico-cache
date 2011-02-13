@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2010 Junpei Kawamoto
+ *  Copyright (C) 2010, 2011 Junpei Kawamoto
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,8 +21,12 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +38,7 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import nor.core.plugin.Plugin;
+import nor.core.plugin.PluginAdapter;
 import nor.core.proxy.filter.FilterRegister;
 import nor.core.proxy.filter.MessageHandler;
 import nor.core.proxy.filter.MessageHandlerAdapter;
@@ -49,9 +53,10 @@ import nor.http.HttpRequest;
 import nor.http.HttpResponse;
 import nor.http.Status;
 import nor.util.FixedSizeMap;
+import nor.util.io.Stream;
 import nor.util.log.Logger;
 
-public class NicoCacheNor extends Plugin{
+public class NicoCacheNor extends PluginAdapter{
 
 	// http://smile-{xxxxx}.nicovideo.jp/smile?v={id}.{rand}
 	private final Properties properties = new Properties();
@@ -65,7 +70,6 @@ public class NicoCacheNor extends Plugin{
 	//  Constant strings
 	//============================================================================
 	private static final String Folder = "folder";
-	private static final String DefaultFolder = "./cache/nico";
 
 	private static final String ServerName = "NicoCacheNor/0.1";
 	private static final String MIMETemplate = "video/%s";
@@ -88,25 +92,32 @@ public class NicoCacheNor extends Plugin{
 	//  Public methods
 	//============================================================================
 	@Override
-	public void init(final File conf){
+	public void init(final File common, final File local) throws IOException{
+		LOGGER.entering("init", common, local);
 
-		if(conf.exists()){
+		if(!common.exists()){
 
-			try {
-				this.properties.load(new FileReader(conf));
-			} catch (FileNotFoundException e) {
-				// TODO 自動生成された catch ブロック
-				e.printStackTrace();
-			} catch (IOException e) {
-				// TODO 自動生成された catch ブロック
-				e.printStackTrace();
-			}
+			final InputStream in = this.getClass().getResourceAsStream("default.conf");
+			final OutputStream out = new FileOutputStream(common);
+
+			Stream.copy(in, out);
+
+			out.close();
+			in.close();
 
 		}
+		final Reader commonIn = new FileReader(common);
+		this.properties.load(commonIn);
+		commonIn.close();
 
-		if(!this.properties.containsKey(Folder)){
+		if(local.exists()){
 
-			this.properties.setProperty(Folder, DefaultFolder);
+			final Reader localIn = new FileReader(local);
+			final Properties localProp = new Properties();
+			localProp.load(localIn);
+			localIn.close();
+
+			this.properties.putAll(localProp);
 
 		}
 
@@ -115,6 +126,7 @@ public class NicoCacheNor extends Plugin{
 
 		StoringToFileFilter.deleteTemplaryFiles(this.dir);
 
+		LOGGER.exiting("init");
 	}
 
 	@Override
@@ -126,7 +138,10 @@ public class NicoCacheNor extends Plugin{
 				new ResponseFilterAdapter(TitleURLPattern, TitleMIMEPattern){
 
 					@Override
-					public void update(final HttpResponse msg, final MatchResult url, final MatchResult cType, final FilterRegister reg) {
+					public void update(final HttpResponse msg,
+							final MatchResult url, final MatchResult cType, final FilterRegister reg) {
+
+						LOGGER.entering(this.getClass(), "update", msg, url, cType, reg);
 
 						if(msg.getStatus() == Status.OK){
 
@@ -146,6 +161,7 @@ public class NicoCacheNor extends Plugin{
 
 						}
 
+						LOGGER.exiting(this.getClass(), "update");
 					}
 
 				},
@@ -154,7 +170,10 @@ public class NicoCacheNor extends Plugin{
 				new ResponseFilterAdapter(VideoURLPattern, VideoMIMEPattern){
 
 					@Override
-					public void update(final HttpResponse msg, final MatchResult url, final MatchResult cType, final FilterRegister register) {
+					public void update(final HttpResponse msg,
+							final MatchResult url, final MatchResult cType, final FilterRegister register) {
+
+						LOGGER.entering(this.getClass(), "update", msg, url, cType, register);
 
 						if(msg.getStatus() == Status.OK){
 
@@ -185,7 +204,7 @@ public class NicoCacheNor extends Plugin{
 														for(final File low : NicoCacheNor.this.findLowCaches(id)){
 
 															low.delete();
-															LOGGER.info("update", "Delete the cache; {0}", low);
+															LOGGER.info(this.getClass(), "update", "Delete the cache; {0}", low);
 
 														}
 
@@ -198,7 +217,7 @@ public class NicoCacheNor extends Plugin{
 										}
 										register.add(f);
 
-										LOGGER.info("update", "Store this video to {0}", dest);
+										LOGGER.info(this.getClass(), "update", "Store this video to {0}", dest);
 
 									} catch (final IOException e) {
 
@@ -211,6 +230,8 @@ public class NicoCacheNor extends Plugin{
 							}
 
 						}
+
+						LOGGER.exiting(this.getClass(), "update");
 
 					}
 
@@ -229,6 +250,7 @@ public class NicoCacheNor extends Plugin{
 
 					@Override
 					public HttpResponse doRequest(final HttpRequest request, final MatchResult m) {
+						LOGGER.entering(this.getClass(), "doRequest", request, m);
 
 						File src = null;
 						final String id = m.group(1);
@@ -267,18 +289,18 @@ public class NicoCacheNor extends Plugin{
 								header.set(HeaderName.Server, ServerName);
 								header.set(HeaderName.ContentType, String.format(MIMETemplate, ext));
 
-								LOGGER.info("doRequest", "Return from the cache: {0}", src);
+								LOGGER.info(this.getClass(), "doRequest", "Return from the cache: {0}", src);
 
 
 							} catch (final FileNotFoundException e) {
 
-								LOGGER.warning("doRequest", e.toString());
-								LOGGER.catched(Level.FINE, "doRequest", e);
+								LOGGER.catched(Level.WARNING, this.getClass(), "doRequest", e);
 
 							}
 
 						}
 
+						LOGGER.exiting(this.getClass(), "doRequest");
 						return ret;
 
 					}
@@ -298,7 +320,6 @@ public class NicoCacheNor extends Plugin{
 		return this.findIfMatches(pat);
 
 	}
-
 
 	private File[] findLowCaches(final String id){
 
