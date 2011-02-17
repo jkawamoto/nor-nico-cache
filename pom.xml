@@ -4,7 +4,7 @@
 	<groupId>nor</groupId>
 	<artifactId>NicoCacheNorPlugin</artifactId>
 	<name>NicoCacheNorPlugin</name>
-	<version>0.2.20110214</version>
+	<version>0.2.0</version>
 
 	<build>
 
@@ -80,7 +80,8 @@
 		<dependency>
 			<groupId>nor</groupId>
 			<artifactId>nor</artifactId>
-			<version>0.2.2-SNAPSHOT</version>
+			<version>0.3.0</version>
+			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>
