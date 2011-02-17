@@ -71,7 +71,7 @@ public class NicoCacheNor extends PluginAdapter{
 	//============================================================================
 	private static final String Folder = "folder";
 
-	private static final String ServerName = "NicoCacheNor/0.1";
+	private static final String ServerName = "NicoCacheNor/0.2.0";
 	private static final String MIMETemplate = "video/%s";
 
 	private static final String TitleURLPattern = "/watch/\\w{2}(\\d+)";

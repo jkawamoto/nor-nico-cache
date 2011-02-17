@@ -1,4 +1,4 @@
-NicoCacheNorPlugin version 0.1
+NicoCacheNorPlugin version 0.2
 =================================
 
 概要
